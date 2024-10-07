@@ -8,7 +8,7 @@ SUBNET=192.168.1.0/24
 
 all:
 
-ipvlan_l2:
+ipvlan_l2_network:
 	docker network create -d ipvlan \
 		--gateway ${GATEWAY} \
 		--ip-range ${RANGE} \
@@ -16,3 +16,8 @@ ipvlan_l2:
 		-o ipvlan_mode=l2 \
 		-o parent=${DEV} \
 		${NAME}
+
+ipvlan_l2_rollback:
+	docker network rm ${NAME}
+
+
