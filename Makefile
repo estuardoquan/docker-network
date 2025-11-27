@@ -1,5 +1,4 @@
 ADDR=10.0.0.64
-DEV=ipvlan0
 INT=enp2s0
 MASK=24
 GATEWAY=10.0.0.1
@@ -9,7 +8,9 @@ SUBNET=10.0.0.0/${MASK}
 all:
 
 install_%:
-	sh -c "./ipvlan.sh network ${ADDR} ${INT} > /bin/$<"
+	./ipvlan.sh check $* || \
+	echo "Unable to create files" && \
+	sh -c "./ipvlan.sh network -d $* -m ${MASK} ${ADDR} ${INT} > ./test/$*"
 
 ipvlan_network:
 	docker network create -d ipvlan \
@@ -17,7 +18,7 @@ ipvlan_network:
 		--ip-range ${RANGE} \
 		--subnet ${SUBNET} \
 		-o ipvlan_mode=l2 \
-		-o parent=${DEV} \
+		-o parent=${INT} \
 		${@}
 
 macvlan_network:
@@ -25,7 +26,7 @@ macvlan_network:
 		--gateway ${GATEWAY} \
 		--ip-range ${RANGE} \
 		--subnet ${SUBNET} \
-		-o parent=${DEV} \
+		-o parent=${INT} \
 		${@}
 
 

@@ -1,5 +1,14 @@
 #!/bin/sh
 
+error_msg() {
+	local funcname=${1:?$(error_msg ${FUNCNAME} "Missing parameter 'funcname'")}
+	local msg=${2:?$(error_msg ${FUNCNAME} "Missing parameter 'msg'")}
+
+	printf "[%s] Error: %s\n" "${funcname}" "${msg}"
+
+	return 0
+}
+
 usage() {
 	printf "%s\n" \
 		"Usage: ipvlan [COMMAND] [OPTIONS]" \
@@ -15,8 +24,9 @@ usage_network() {
 		"Options:"
 
 	printf "  %s\n" \
-		"-d | --dev    Change the DEV name (Default: ipvlan0)" \
-		"-m | --mask   Change the subnet MASK (Default: 24)" \
+		"-d | --dev    Modify DEV name (Default: ipvlan0)" \
+		"-m | --mask   Modify subnet MASK (Default: 24)" \
+		"-o | --out    Redirect output (Default: STDOUT)" \
 		"-r | --run    Temporarily create/run (Default: 0)"
 }
 
@@ -24,15 +34,6 @@ usage_service() {
 	printf "%s\n" \
 		"Usage: ipvlan service NAME BIN" \
 		"Print SYSTEMD Service Stub"
-}
-
-error_msg() {
-	local funcname=${1:?$(error_msg ${FUNCNAME} "Missing parameter 'funcname'")}
-	local msg=${2:?$(error_msg ${FUNCNAME} "Missing parameter 'msg'")}
-
-	printf "[%s] Error: %s\n" "${funcname}" "${msg}"
-
-	return 0
 }
 
 print_network() {
@@ -71,11 +72,6 @@ print_network() {
 }
 
 print_service() {
-
-	if [[ "${1}" == '-h' || "${1}" == "--help" ]]; then
-		return 1
-	fi
-
 	local error=0
 
 	if [ -z "${1}" ]; then
@@ -98,7 +94,7 @@ print_service() {
 
 	printf "%s\n" \
 		"[Unit]" \
-		"Description=Setup ${name}" \
+		"Description=${name}" \
 		"After=network-online.target" \
 		"Wants=network-online.target" \
 		"" \
@@ -114,8 +110,8 @@ print_service() {
 }
 
 make_network() {
-	local opt="d:m:hr"
-	local long="dev:,mask:,help,run"
+	local opt="d:m:o:hr"
+	local long="dev:,mask:,out:,help,run"
 
 	local o=$(getopt -o "${opt}" --long "${long}" -- "${@}")
 
@@ -125,25 +121,30 @@ make_network() {
 		return 1
 	fi
 
-	set -- ${o}
+	eval set -- ${o}
 
 	local dev=ipvlan0
 	local mask=24
-	local out=1
+	local out=/dev/stdout
+	local run=0
 
 	while true; do
 		case "${1}" in
 		-d | --dev)
-			dev="$2"
+			dev="${2}"
 			shift 2
 			;;
 		-m | --mask)
-			mask="$2"
+			mask="${2}"
+			shift 2
+			;;
+		-o | --out)
+			out="${2}"
 			shift 2
 			;;
 		-r | --run)
-			out=0
-			shift 1
+			run=1
+			shift 2
 			;;
 		--)
 			shift 1
@@ -175,47 +176,58 @@ make_network() {
 	local addr=$1
 	local int=$2
 
-	set -- ${addr}/${mask} ${dev} ${int}
+	eval set -- ${addr}/${mask} ${dev} ${int}
 
-	if [[ "${out}" == "0" ]]; then
+	if [[ ${run} == 1 ]]; then
 		sh -c "$(print_network ${@})"
 
 		if [ $? != 0 ]; then
 			return 1
 		fi
-	else
-		print_network "${addr}/${mask}" "${dev}" "${int}"
+
+		return 0
 	fi
+
+	print_network ${@} >"${out}"
 
 	return 0
 
 }
 
-check() {
-	if [ -z "${1}" ]; then
-		error_msg ${FUNCNAME} "Missing parameter 'name'"
+make_service() {
+	local opt="o:h"
+	local long="out:,help"
 
-		return 1
-	fi
-
-	local name=${1}
-
-	if [[ -f "/etc/systemd/system/${name}.service" || -f "/bin/${name}" ]]; then
-		return 1
-	fi
-
-	return 0
-}
-
-if [[ "${1}" == "check" ]]; then
-	shift 1
-
-	check ${@}
+	local o=$(getopt -o "${opt}" --long "${long}" -- "${@}")
 
 	if [ $? != 0 ]; then
-		exit 1
+		error_msg ${FUNCNAME} "Unable to parse options"
+
+		return 1
 	fi
-fi
+
+	eval set -- ${o}
+
+	local out=/dev/stdout
+
+	while true; do
+		case "${1}" in
+		-o | --out)
+			out="${2}"
+			shift 2
+			;;
+		--)
+			shift 1
+			break
+			;;
+		*)
+			return 1
+			;;
+		esac
+	done
+
+	print_service ${@} >${out}
+}
 
 if [[ "${1}" == "network" ]]; then
 	shift 1
@@ -233,7 +245,7 @@ fi
 if [[ "${1}" == "service" ]]; then
 	shift 1
 
-	print_service ${@}
+	make_service ${@}
 
 	if [ $? != 0 ]; then
 		usage_service
