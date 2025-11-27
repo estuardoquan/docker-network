@@ -1,9 +1,15 @@
-DEV=enp2s0
+ADDR=10.0.0.64
+DEV=ipvlan0
+INT=enp2s0
+MASK=24
 GATEWAY=10.0.0.1
-RANGE=10.0.0.64/26
-SUBNET=10.0.0.0/24
+RANGE=${ADDR}/26
+SUBNET=10.0.0.0/${MASK}
 
 all:
+
+install_%:
+	sh -c "./ipvlan.sh network ${ADDR} ${INT} > /bin/$<"
 
 ipvlan_network:
 	docker network create -d ipvlan \
