@@ -26,7 +26,7 @@ usage_network() {
 	printf "  %s\n" \
 		"-d | --dev    Modify DEV name (Default: ipvlan0)" \
 		"-m | --mask   Modify subnet MASK (Default: 24)" \
-		"-o | --out    Redirect output (Default: STDOUT)" \
+		"-o | --out    Redirect output and add shebang (Default: empty)" \
 		"-r | --run    Temporarily create/run (Default: 0)"
 }
 
@@ -64,7 +64,6 @@ print_network() {
 	local int=${3}
 
 	printf "%s\n" \
-		"#!/bin/sh" \
 		"ip link add ${dev} link ${int} type ipvlan mode l2" \
 		"ip addr add ${addr} dev ${dev}" \
 		"ip link set ${dev} up"
@@ -121,7 +120,7 @@ make_network() {
 
 	local dev=ipvlan0
 	local mask=24
-	local out=/dev/stdout
+	local out=
 	local run=0
 
 	while true; do
@@ -184,7 +183,15 @@ make_network() {
 		return 0
 	fi
 
-	print_network ${@} >"${out}"
+	if [ -n "${out}" ]; then
+		printf "%s\n" "#!/bin/sh" >${out}
+
+		print_network ${@} >>${out}
+
+		return 0
+	fi
+
+	print_network ${@}
 
 	return 0
 
@@ -224,14 +231,6 @@ make_service() {
 
 	print_service ${@} >${out}
 }
-
-if [[ "${1}" == "check" ]]; then
-	# if [[ -f "/etc/systemd/system/${2}.service" || -f "/bin/${2}"]]; then
-	# 	exit 1
-	# fi
-
-	exit 0
-fi
 
 if [[ "${1}" == "network" ]]; then
 	shift 1
