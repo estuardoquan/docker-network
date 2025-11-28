@@ -64,6 +64,7 @@ print_network() {
 	local int=${3}
 
 	printf "%s\n" \
+		"#!/bin/sh" \
 		"ip link add ${dev} link ${int} type ipvlan mode l2" \
 		"ip addr add ${addr} dev ${dev}" \
 		"ip link set ${dev} up"
@@ -77,11 +78,6 @@ print_service() {
 	if [ -z "${1}" ]; then
 		error=1
 		error_msg ${FUNCNAME} "Missing parameter 'name'"
-	fi
-
-	if [ -z "${2}" ]; then
-		error=1
-		error_msg ${FUNCNAME} "Missing parameter 'bin'"
 	fi
 
 	if [ ${error} == 1 ]; then
@@ -144,7 +140,7 @@ make_network() {
 			;;
 		-r | --run)
 			run=1
-			shift 2
+			shift 1
 			;;
 		--)
 			shift 1
@@ -228,6 +224,14 @@ make_service() {
 
 	print_service ${@} >${out}
 }
+
+if [[ "${1}" == "check" ]]; then
+	# if [[ -f "/etc/systemd/system/${2}.service" || -f "/bin/${2}"]]; then
+	# 	exit 1
+	# fi
+
+	exit 0
+fi
 
 if [[ "${1}" == "network" ]]; then
 	shift 1
