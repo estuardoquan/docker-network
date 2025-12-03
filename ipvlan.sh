@@ -25,6 +25,7 @@ usage_network() {
 
 	printf "  %s\n" \
 		"-d | --dev    Modify DEV name (Default: ipvlan0)" \
+		"-h | --help   Prints this message" \
 		"-m | --mask   Modify subnet MASK (Default: 24)" \
 		"-o | --out    Redirect output and add shebang (Default: empty)" \
 		"-r | --run    Temporarily create/run (Default: 0)"
@@ -33,7 +34,14 @@ usage_network() {
 usage_service() {
 	printf "%s\n" \
 		"Usage: ipvlan service NAME BIN" \
-		"Print SYSTEMD Service Stub"
+		"Print SYSTEMD Service Stub" \
+		"" \
+		"Options:"
+
+	printf "  %s\n" \
+		"-e | --exec   modifies the exec start binary" \
+		"-h | --help   Prints this message" \
+		"-o | --out    Redirect output and add shebang (Default: empty)"
 }
 
 print_network() {
@@ -79,13 +87,18 @@ print_service() {
 		error_msg ${FUNCNAME} "Missing parameter 'name'"
 	fi
 
+	if [ -z "${2}" ]; then
+		error=1
+		error_msg ${FUNCNAME} "Missing parameter 'exec'"
+	fi
+
 	if [ ${error} == 1 ]; then
 		printf "\n"
 		return 1
 	fi
 
 	local name=${1}
-	local bin=${2}
+	local exec=${2}
 
 	printf "%s\n" \
 		"[Unit]" \
@@ -95,7 +108,7 @@ print_service() {
 		"" \
 		"[Service]" \
 		"Type=oneshot" \
-		"ExecStart=${bin}" \
+		"ExecStart=${exec}" \
 		"RemainAfterExit=yes" \
 		"" \
 		"[Install]" \
@@ -198,8 +211,8 @@ make_network() {
 }
 
 make_service() {
-	local opt="o:h"
-	local long="out:,help"
+	local opt="e:o:h"
+	local long="exec:,out:,help"
 
 	local o=$(getopt -o "${opt}" --long "${long}" -- "${@}")
 
@@ -212,9 +225,14 @@ make_service() {
 	eval set -- ${o}
 
 	local out=/dev/stdout
+	local exec=
 
 	while true; do
 		case "${1}" in
+		-e | --exec)
+			exec="${2}"
+			shift 2
+			;;
 		-o | --out)
 			out="${2}"
 			shift 2
@@ -229,7 +247,13 @@ make_service() {
 		esac
 	done
 
-	print_service ${@} >${out}
+	local name=$1
+
+	if [ -z "${exec}" ]; then
+		exec=/bin/${1}
+	fi
+
+	print_service ${name} ${exec} >${out}
 }
 
 if [[ "${1}" == "network" ]]; then
